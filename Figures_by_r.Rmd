@@ -1,0 +1,683 @@
+---
+title: "Figures by R"
+output: html_document
+date: "2024-11-18"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(forcats) 
+```
+
+
+```{r}
+# Fig 6-B #
+
+# Importing cleaned data in pandas (csv file is attached to the repository)
+wdf_6 <- read_csv('C:\\Users\\Mhaha\\wdf_6.csv')
+wdf_6 <- wdf_6[,-1]
+colnames(wdf_6) <- c('Mode', 'Duration', 'Unit')
+
+# Further data manipulation 
+wdf_6_long <- wdf_6 %>%
+  pivot_longer(cols = c(Mode, Duration, Unit), 
+               names_to = "Category", 
+               values_to = "Value") %>%
+  filter(!is.na(Value) & Value != "")  
+
+
+wdf_6_counts <- wdf_6_long %>%
+  count(Category, Value) %>%
+  arrange(Category, desc(n)) %>%  
+  mutate(Value = fct_reorder(Value, n)) 
+
+
+wdf_6_counts$Category <- factor(wdf_6_counts$Category, levels = c("Mode", "Duration", "Unit"))
+
+
+wdf_6_counts$Color <- case_when(
+  wdf_6_counts$Category == "Mode" ~ "lightblue",
+  wdf_6_counts$Category == "Duration" ~ "lightgreen",
+  wdf_6_counts$Category == "Unit" ~ "lightgrey"
+)
+
+# visuazliation via ggplot
+ggplot(wdf_6_counts, aes(x = Category, y = n, fill = Color)) +  
+  geom_bar(stat = "identity", color = "black", size = 0.1, width = 0.9) +  
+  scale_fill_identity() +  
+  coord_flip() +  
+  scale_y_continuous(expand = expansion(mult = c(0, 0.1)), name = "Count") +  
+  labs(title = "Cell Culture Mode, Duration, and Seeding Unit") +
+  theme_minimal(base_size = 14) +  
+  theme(panel.background = element_rect(fill = "#f0f0f0"),  
+        panel.grid.major = element_blank(),  
+        panel.grid.minor = element_blank(),  
+        legend.position = "none",
+        plot.title = element_text(hjust = 0.5, size = 14, face = "bold", margin = margin(b = 15)),
+        axis.text.y = element_text(size = 12.5, face = "bold", margin = margin(r = 10)),
+        axis.title.x = element_text(size = 13.5),
+        axis.text.x = element_text(size = 9.5),
+        axis.title.y = element_blank())
+```
+
+
+```{r}
+ # Fig 6-C #
+
+# Importing cleaned data in pandas (csv file is attached to the repository)
+final_cell <- read_csv('C:\\Users\\Mhaha\\final_cell.csv')
+final_cell <- final_cell[,-1]
+
+# Further data manipulation 
+final_cell_filtered <- final_cell %>%
+  filter_all(any_vars(!is.na(.) & . != ""))
+
+final_cell_long <- final_cell_filtered %>%
+  pivot_longer(cols = everything(), 
+               names_to = "Cell_Category", 
+               values_to = "Cell_Name") %>%
+  filter(!is.na(Cell_Name) & Cell_Name != "")
+
+cell_counts <- final_cell_long %>%
+  group_by(Cell_Category, Cell_Name) %>%
+  summarize(Count = n(), .groups = "drop")
+
+cell_counts <- cell_counts %>%
+  mutate(Cell_Name = ifelse(Cell_Name == "Organotypic (SC)", "Organotypic\n(SC)", Cell_Name))
+
+cell_counts$Cell_Category <- factor(cell_counts$Cell_Category, 
+                                    levels = c("Stem_cells", 
+                                               sort(setdiff(unique(cell_counts$Cell_Category), c("Stem_cells", "Other"))), 
+                                               "Other"))
+cell_counts <- cell_counts %>%
+  arrange(Cell_Category, desc(Count)) %>%  
+  group_by(Cell_Category) %>%              
+  mutate(Cell_Name = factor(Cell_Name, levels = Cell_Name[order(-Count)])) 
+
+# visuazliation via ggplot
+bar_color <- "#C5E1A5"
+
+ggplot(cell_counts, aes(x = Cell_Category, y = Count, fill = Cell_Name)) +
+  geom_bar(stat = 'identity', 
+           position = position_dodge(width = 0.9), 
+           color = "black", 
+           size = 0.3) + 
+  geom_text(aes(label = Cell_Name), 
+            position = position_dodge(width = 0.9), 
+            vjust = -0.1,
+            hjust=-0.1,
+            size = 5,      
+            fontface = "bold", 
+            color = "black",
+            angle = 60) +  
+  scale_fill_manual(values = rep(bar_color, nrow(cell_counts)), guide = "none") +  
+  scale_y_continuous(expand = expansion(mult = c(0, 0.1)),  
+                     breaks = seq(0, max(cell_counts$Count), by = 5), 
+                     name = "Count") +  
+  theme_minimal(base_size = 14, base_family = "") + 
+  theme(panel.background = element_rect(fill = "#f0f0f0"),  
+        panel.grid.major.y = element_line(color = "grey80", linetype = "dashed", size = 1.2),  
+        legend.position = "none", 
+        plot.title = element_text(hjust = 0.5, size = 21, face = "bold"),  
+        axis.text.x = element_text(size = 17, face = "bold"), 
+        axis.text.y = element_text(size = 16, face = "bold"),  
+        axis.title.x = element_blank(),
+        axis.title.y = element_text(size = 16, face = "bold")) +   
+  ggtitle("Cell Types and Frequencies") 
+```
+
+
+```{r}
+ # Fig 7-B1 #
+
+# importing wdf_12.csv (csv file is attached to the repository)
+wdf_12 <- read_csv('C:\\Users\\Mhaha\\wdf_12.csv')
+wdf_12 <- wdf_12[,-1]
+
+# Data manipulation for graphing
+colnames(wdf_12)[1] <- "Carbon_type"
+
+wdf_12_long <- wdf_12 %>%
+  pivot_longer(cols = everything(), 
+               names_to = "Material_Category", 
+               values_to = "Material_Name") %>%
+  filter(!is.na(Material_Name) & Material_Name != "")  
+wdf_12_long <- wdf_12_long %>%
+  mutate(Material_Category = gsub("Semiconductor", "Semi-\nconductor", Material_Category))
+wdf_12_long <- wdf_12_long %>%
+  mutate(Material_Category = gsub("BiFeO3", "BiFe\nO3", Material_Category))
+
+
+wdf_12_long <- wdf_12_long %>%
+  mutate(Material_Category = gsub("_type", "", Material_Category))
+
+
+material_counts <- wdf_12_long %>%
+  group_by(Material_Category, Material_Name) %>%
+  summarize(Count = n(), .groups = "drop")
+
+material_counts$Material_Category <- factor(material_counts$Material_Category, 
+                                            levels = c("Carbon", 
+                                                       "Polymer", 
+                                                       "Metal", 
+                                                       setdiff(unique(material_counts$Material_Category), 
+                                                               c("Carbon", "Polymer", "Metal", "Ceramic")),
+                                                       "Ceramic"))
+
+
+material_counts <- material_counts %>%
+  arrange(Material_Category, desc(Count)) %>% 
+  group_by(Material_Category) %>%               
+  mutate(Material_Name = factor(Material_Name, levels = Material_Name[order(-Count)]))  
+
+
+light_brown_color <- "#E5C6A4"  
+
+# graphing with ggplot
+ggplot(material_counts, aes(x = Material_Category, y = Count, fill = Material_Name)) +
+  geom_bar(stat = 'identity', 
+           position = position_dodge(width = 0.9), 
+           color = "black", 
+           size = 0.3) +  
+  geom_text(aes(label = Material_Name), 
+            position = position_dodge(width = 0.9), 
+            vjust = -0.2,
+            hjust = 0,
+            size = 4.25,      
+            fontface = "bold", 
+            color = "black",
+            angle = 50) + 
+  scale_fill_manual(values = rep(light_brown_color, nrow(material_counts)), guide = "none") +  
+  scale_y_continuous(expand = expansion(mult = c(0, 0.1)),  
+                     breaks = seq(0, max(material_counts$Count), by = 2),  
+                     name = "Count") + 
+  theme_minimal(base_size = 14, base_family = "") +  
+  theme(panel.background = element_rect(fill = "#f0f0f0"),  
+        panel.grid.major.y = element_line(color = "grey80", linetype = "dashed", size = 0.8),  
+        legend.position = "none",  
+        plot.title = element_text(hjust = 0.5, size = 21, face = "bold"),  
+        axis.text.x = element_text(size = 15, face = "bold"), 
+        axis.text.y = element_text(size = 16, face = "bold"), 
+        axis.title.x = element_blank(),
+        axis.title.y = element_text(size = 16, face = "bold")) +
+  ggtitle("Nanomaterial Types and Frequencies")
+```
+
+
+```{r}
+# Fig 7-B2 #
+
+# importing wdf_13.csv (csv file is attached to the repository)
+
+wdf_13 <- read_csv('C:\\Users\\Mhaha\\wdf_13.csv')
+wdf_13 <- wdf_13[,-1]
+colnames(wdf_13) <- 'Material_Type'
+# Data manipulation for graphing
+material_counts <- wdf_13 %>%
+  group_by(Material_Type) %>%
+  summarise(Count = n()) %>%
+  mutate(Percentage = (Count / sum(Count)) * 100)  
+
+
+material_counts$Material_Type <- factor(material_counts$Material_Type, 
+                                        levels = material_counts$Material_Type[order(-material_counts$Percentage)])
+
+# plotting with ggplot
+ggplot(material_counts, aes(x = Material_Type, y = Percentage)) +
+  geom_bar(stat = 'identity', fill = "#E5C6A4", color = "black", size = 0.3) +  
+  geom_text(aes(label = sprintf("%.1f%%", Percentage)), 
+            vjust = 0,
+            hjust = -0.1,
+            size =4.5,      
+            fontface = "bold", 
+            color = "black") +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.1)), name = "Percentage of Studies") +  
+  theme_minimal(base_size = 14) +  
+  theme(panel.background = element_rect(fill = "#f0f0f0"),  
+        legend.position = "none",  
+        plot.title = element_text(hjust = 0.5, size = 18, face = "bold"),  
+        axis.text.y = element_text(size = 14, face = "bold"),  
+        axis.title.y = element_blank(),  
+        axis.title.x = element_text(size = 14,face = "bold", margin = margin(t = 10))) +  
+  ggtitle("Nanomaterial Type Distribution") + 
+  coord_flip()
+```
+
+
+```{r}
+            # Fig 7-D #
+
+# importing wdf_15.csv (csv file is attached to the repository)
+
+wdf_15 <- read_csv('C:\\Users\\Mhaha\\wdf_15.csv')
+wdf_15 <- wdf_15[,-1]
+
+wdf_15_long <- wdf_15 %>%
+  select(Nano_Hyd_integration, Nanomat_dimension) %>%
+  pivot_longer(cols = everything(), names_to = "Category", values_to = "Value") %>%
+  filter(Value != "" & !is.na(Value))  
+
+
+wdf_15_counts <- wdf_15_long %>%
+  count(Category, Value) %>%
+  arrange(desc(n)) %>%
+  mutate(Value = fct_reorder(Value, n, .desc = TRUE))  
+
+colors <- c("Integration" = "lightblue", "Dimension" = "lightcoral")
+
+
+wdf_15_counts$Category <- factor(wdf_15_counts$Category, 
+                                    levels = c("Nano_Hyd_integration", "Nanomat_dimension"),
+                                    labels = c("Integration", "Dimension"))
+
+
+ggplot(wdf_15_counts, aes(x = Category, y = n, fill = Category)) +
+  geom_bar(stat = "identity", color = "black", size = 0.1, width = 0.8) +  
+  scale_fill_manual(values = colors) +  
+  coord_flip() +  
+  scale_y_continuous(expand = expansion(mult = c(0, 0.1)), name = "Count") +  
+  labs(title = "Nanomaterials' Integration and Dimension") +
+  theme_minimal(base_size = 14) +  
+  theme(panel.background = element_rect(fill = "#f0f0f0"),
+        legend.position = "none",
+        plot.title = element_text(hjust = 0.5, size = 18, face = "bold", margin = margin(b = 15)),
+        axis.text.y = element_text(size = 14, face = "bold", margin = margin(r = 1)),
+        axis.text.x = element_text(size = 13, face = "bold"),
+        axis.title.y = element_blank())
+```
+
+
+```{r}
+
+                                      # Fig 8-A1 #
+
+# The data defined here were obtained from the analysis made in python (refer to wdf_16)
+data <- data.frame(
+  In_vitro_hyd_assay = c("Mechanical Test", "Electrical Property", "Rheological Test", 
+                         "Swelling Test", "Degredation Test", "Porosity"),
+  count = c(62, 57, 49, 44, 31, 26)
+)
+
+# Create the horizontal bar chart
+ggplot(data, aes(x = reorder(In_vitro_hyd_assay, -count), y = count)) +  
+  geom_bar(stat = 'identity', 
+           fill = "lightblue",  
+           color = "black", 
+           size = 0.3) +  
+  geom_text(aes(label = count), 
+            position = position_dodge(width = 0.9), 
+            hjust = -0.2,  
+            size = 5,      
+            fontface = "bold", 
+            color = "black") +  
+  scale_y_continuous(breaks = seq(0, max(data$count), by = 10),  
+                     expand = expansion(mult = c(0, 0.1)),  
+                     name = "Number of Studies",  
+                     labels = scales::label_number(scale = 1)) +  
+  theme_minimal(base_size = 14) +  
+  theme(panel.background = element_rect(fill = "#f0f0f0"),  
+        legend.position = "none",  
+        plot.title = element_text(hjust = 0.5, size = 18, face = "bold"),  
+        axis.text.y = element_text(size = 13, face = "bold"),  
+        axis.title.y = element_blank(),  
+        axis.title.x = element_text(size = 14, face='bold')) +  
+  coord_flip() +  
+  ggtitle("In Vitro Hydrogel Characterization Methods")  
+```
+
+
+```{r}
+# Fig 8-A2 #
+
+# The data defined here were obtained from the analysis made in python (refer to wdf_17)
+data <- data.frame(
+  method = c("In Vitro (Neural Protein Expression Analysis)", "In Vivo (Neural Protein Expression Analysis)", 
+             "Neural Gene Expression Analysis", "Cell Viability: L/D staining", "Cell Viability: MTT", 
+             "Cell Viability: Other", "Cell Proliferation: CCK-8", "Cell Proliferation: Other", 
+             "Cell Adhesion", "Cell Migration: Transwell", "Cell Migration: Other"),
+  count = c(73, 14, 37, 52, 18, 20, 40, 13, 21, 5, 3)
+)
+
+
+data$group <- ifelse(data$method %in% c("In Vitro (Neural Protein Expression Analysis)", 
+                                        "In Vivo (Neural Protein Expression Analysis)"),
+                     "Neural Protein Expression Analysis", 
+                     ifelse(grepl("Cell Viability", data$method), "Cell Viability",
+                            ifelse(grepl("Cell Proliferation", data$method), "Cell Proliferation",
+                                   ifelse(grepl("Cell Migration", data$method), "Cell Migration", data$method))))
+
+
+total_counts <- data %>%
+  group_by(group) %>%
+  summarise(total_count = sum(count))
+
+total_counts <- total_counts %>%
+  arrange(desc(total_count))
+
+
+ggplot(data, aes(x = factor(group, levels = total_counts$group), y = count, fill = "lightgreen")) +  
+  geom_bar(stat = 'identity', 
+           color = "black", 
+           size = 0.3) +  
+  
+  geom_text(data = total_counts, 
+            aes(x = group, y = total_count + 3, label = total_count),  
+            size = 5, 
+            hjust = -0.1,
+            fontface = "bold", 
+            color = "black") + 
+  scale_y_continuous(breaks = seq(0, max(data$count), by = 10),  
+                     expand = expansion(mult = c(0, 0.1)),  
+                     name = "Number of Studies",  
+                     labels = scales::label_number(scale = 1)) +  
+  theme_minimal(base_size = 14) +  
+  theme(panel.background = element_rect(fill = "#f0f0f0"),  
+        legend.position = "none",  
+        plot.title = element_text(hjust = 0.5, size = 18, face = "bold"),  
+        axis.text.y = element_text(size = 14, face = "bold"),  
+        axis.title.y = element_blank(),  
+        axis.title.x = element_text(size = 14, face = "bold")) +  
+  coord_flip() +  # Make the bar chart horizontal
+  ggtitle("In Vitro Cell Characterization Methods") +  
+  scale_fill_manual(values = c("lightgreen"))  
+```
+
+
+```{r}
+    #  Fig 9-B (upper)  #
+
+# The data defined here were obtained from the analysis made in python (refer to wdf_22)
+
+
+
+df_neuro <- data.frame(
+  Neurotrophic_Factor = c("NGF", "RA", "bFGF", "BDNF"),
+  Percentage = c(31.4, 25.7, 17.1, 8.6)
+)
+
+
+df_neuro <- df_neuro %>%
+  arrange(Percentage)
+
+
+ggplot(df_neuro, aes(x = Percentage, y = reorder(Neurotrophic_Factor, Percentage), fill = Neurotrophic_Factor)) +
+  geom_bar(stat = 'identity', color = "black", size = 0.3, 
+           position = position_dodge(width = 0.7)) +  
+  geom_text(aes(label = paste0(Percentage, "%")),  
+            hjust = 1.2, size = 4.5, fontface = "bold", color = "black") +  
+  scale_fill_manual(values = rep("#FF8C69", length(unique(df_neuro$Neurotrophic_Factor)))) +  
+  scale_x_continuous(expand = expansion(mult = c(0, 0.1)),  
+                     name = "Percentage of Studies") +  
+  theme_minimal(base_size = 14 * 0.7) + 
+  theme(panel.background = element_rect(fill = "#f0f0f0"), 
+        legend.position = "none",  
+        plot.title = element_text(hjust = 0.5, size = 18, face = "bold"),  
+        axis.text.y = element_text(size = 15, face = "bold"), 
+        axis.title.y = element_blank(),
+        axis.text.x = element_text(size = 13, face = "bold"),  
+        axis.title.x = element_text(size = 13, face = "bold")) +  
+  ggtitle("Different Neurotrophic Factors Used") 
+```
+
+
+```{r}
+#  Fig 9-B (Lower)  #
+
+# The data defined here were obtained from the analysis made in python (refer to wdf_23)
+
+
+df_stim_1 <- data.frame(
+  Stimulation_Type = c("MWS", "DC", "AC", "Other WS"),
+  Count = c(36.1, 36.1, 13.8, 13.8)
+)
+
+
+df_stim_1 <- df_stim_1 %>%
+  arrange(Count)
+
+ggplot(df_stim_1, aes(x = Count, y = reorder(Stimulation_Type, Count), fill = Stimulation_Type)) +
+  geom_bar(stat = 'identity', color = "black", size = 0.3, width = 0.85) +  
+  geom_text(aes(label = paste0(Count, "%")),  
+            hjust = 1.2, size = 4.3, fontface = "bold", color = "black") +  
+  scale_fill_manual(values = rep("#ADD8E6", length(unique(df_stim_1$Stimulation_Type)))) +  
+  scale_x_continuous(expand = expansion(mult = c(0, 0.1)),  
+                     name = "Percentage of Studies") +  
+  theme_minimal(base_size = 14, base_family = "") +  
+  theme(panel.background = element_rect(fill = "#f0f0f0"),  
+        legend.position = "none",  
+        plot.title = element_text(hjust = 0.5, size = 18, face = "bold"),  
+        axis.text.y = element_text(size = 15, face = "bold"),
+        axis.title.x = element_text(size = 13, face = "bold"),
+        axis.text.x = element_text(size = 13, face = "bold"),  
+        axis.title.y = element_blank()) +  
+  ggtitle("Different Stimulation Techniques Used")
+```
+
+
+```{r}
+#  Fig 10-B (upper)  #
+
+# The data defined here were obtained from the analysis made in python (refer to wdf_30)
+
+
+
+
+genetic_marker_group <- c('Astrocytes', 'Neural Stem Cells', 'Neuronal Cells', 'Oligodendrocytes', 'Neurotrophic Factors')
+n <- c(25, 18, 36, 8, 4)
+df <- data.frame(genetic_marker_group, n)
+
+
+df$Percentage_of_Studies <- (df$n / sum(df$n)) * 100
+df$genetic_marker_group <- factor(df$genetic_marker_group, 
+                                  levels = c('Neuronal Cells', 'Astrocytes', 'Neural Stem Cells', 'Oligodendrocytes', 'Neurotrophic Factors'))
+
+
+ggplot(df, aes(x = genetic_marker_group, y = Percentage_of_Studies, fill = Percentage_of_Studies)) +
+  geom_bar(stat = 'identity', color = "black", size = 0.3) + 
+  geom_text(aes(label = sprintf("%.1f%%", Percentage_of_Studies)), 
+            vjust =0.5,
+            hjust = 1,
+            size =6,      
+            fontface = "bold", 
+            color = "black",
+            angle=0) +
+  scale_fill_gradient(low = "#D3E8D5", high = "#004d00") +  
+  scale_y_continuous(expand = expansion(mult = c(0, 0.1)), name = "Percentage of Studies") + 
+  theme_minimal(base_size = 14) + 
+  theme(panel.background = element_rect(fill = "#f0f0f0"), 
+        legend.position = "none",  
+        plot.title = element_text(hjust = 0.5, size = 19, face = "bold"),  
+        axis.text.y = element_text(size = 15, face = "bold"), 
+        axis.title.x = element_text(size = 15, face = "bold", margin = margin(t = 10)), 
+        axis.title.y = element_blank()) +  
+  ggtitle("In Vitro Gene Marker Groups") + 
+  coord_flip() 
+```
+
+
+```{r}
+#  Fig 10-B (lower)  #
+
+# The data defined here were obtained from the analysis made in python (refer to wdf_31)
+
+
+
+Protein_group_type <- c('Neuronal Cells', 'Astrocytes', 'Neural Stem Cells', 'Oligodendrocytes', 'Neurotrophic Factors')
+Number_of_studies <- c(63, 29, 14, 8, 3)
+
+
+In_vitro_Protein_Groups <- data.frame(Protein_group_type, Number_of_studies)
+
+
+In_vitro_Protein_Groups$Percentage_of_Studies <- (In_vitro_Protein_Groups$Number_of_studies / sum(In_vitro_Protein_Groups$Number_of_studies)) * 100
+
+In_vitro_Protein_Groups$Protein_group_type <- factor(In_vitro_Protein_Groups$Protein_group_type, 
+                                                     levels = c('Neuronal Cells', 'Astrocytes', 'Neural Stem Cells', 'Oligodendrocytes', 'Neurotrophic Factors'))
+
+ggplot(In_vitro_Protein_Groups, aes(x = Protein_group_type, y = Percentage_of_Studies, fill = Percentage_of_Studies)) +
+  geom_bar(stat = 'identity', color = "black", size = 0.3) +  
+  geom_text(aes(label = sprintf("%.1f%%", Percentage_of_Studies)), 
+            vjust = 0.5,
+            hjust = -0.05,
+            size = 5.5,      
+            fontface = "bold", 
+            color = "black",
+            angle = 0) +
+  scale_fill_gradient(low = "#ADD8E6", high = "#0066CC") + 
+  scale_y_continuous(expand = expansion(mult = c(0, 0.1)), name = "Percentage of Studies") +  
+  theme_minimal(base_size = 14) +  
+  theme(panel.background = element_rect(fill = "#f0f0f0"),  
+        legend.position = "none",  
+        plot.title = element_text(hjust = 0.5, size = 19, face = "bold"), 
+        axis.text.y = element_text(size = 15, face = "bold"),  
+        axis.title.x = element_text(size = 15, face = "bold", margin = margin(t = 10)), 
+        axis.title.y = element_blank()) +  
+  ggtitle("In Vitro Protein Marker Groups") +coord_flip()
+
+```
+
+```{r}
+
+#  Fig 10-C1  #
+
+wdf_32 <- read_csv('C:\\Users\\Mhaha\\wdf_32.csv')
+wdf_32 <- wdf_32[,-1]
+
+wdf_32_a <- wdf_32 %>% pivot_longer(cols = colnames(wdf_32), names_to = 'group', values_to = 'marker') %>% count(group,marker) %>% drop_na(marker)
+
+df_ng <- wdf_32_a %>%
+  mutate(group = factor(group, 
+                        levels = c(colnames(wdf_32) [2], "Astrocytes", "Neural_Stem_Cells", colnames(wdf_32) [3], "Neurotrophic_Factors"),
+                        labels = c("Neural\nCells", "Astrocytes", "Neural Stem\nCells", "Oligodendrocytes", "Neurotrophic\nFactors"))) %>%
+  group_by(group) %>%
+  arrange(desc(n)) %>%
+  mutate(marker = factor(marker, levels = unique(marker))) %>%
+  ungroup()
+
+
+ggplot(df_ng, aes(x = group, y = n, fill = marker)) +  
+  geom_bar(stat = 'identity', 
+           position = position_dodge(width = 0.9), 
+           color = "black", 
+           size = 0.3) +  
+  geom_text(aes(label = paste(marker)), 
+            position = position_dodge(width = 0.9), 
+            vjust = -0.5,
+            hjust = 0,
+            size = 5,      
+            fontface = "bold", 
+            color = "black",
+            angle = 60) +  
+  scale_fill_manual(values = rep("#C5E1A5", length(unique(df_ng$marker)))) +  
+  scale_y_continuous(breaks = seq(0, max(df_ng$n)+5, by = 5),  
+                     expand = expansion(mult = c(0, 0.1)),  
+                     name = "Count") +  
+  theme_minimal(base_size = 14) +  
+  theme(panel.background = element_rect(fill = "#f0f0f0"),  
+        legend.position = "none",  
+        plot.title = element_text(hjust = 0.5, size = 21, face = "bold"),  
+        axis.text.x = element_text(size = 13.5, face = "bold"),
+        axis.text.y = element_text(size = 16, face = "bold"),  
+        axis.title.x = element_blank(),
+        axis.title.y = element_text(size = 16, face = "bold"),
+        panel.grid.major.y = element_line(color = "grey70", size = 1, linetype = "dashed")) +  
+  ggtitle("In Vitro Analysis of Neural Gene Markers")  
+
+
+```
+
+```{r}
+
+  #  Fig 10-C2  #
+
+wdf_33 <- read_csv('C:\\Users\\Mhaha\\wdf_33.csv')
+wdf_33 <- wdf_33[,-1]
+
+wdf_33_a <- wdf_33 %>% pivot_longer(cols = colnames(wdf_33), names_to = 'group', values_to = 'marker') %>% count(group,marker) %>% drop_na(marker)
+
+wdf_33_a$group <- factor(wdf_33_a$group, 
+                     levels = c(colnames(wdf_33)[2] , colnames(wdf_33)[4], colnames(wdf_33)[1], colnames(wdf_33)[3], colnames(wdf_33)[4]),
+                     labels = c("Neural\nCells", "Astrocytes", "Neural Stem\nCells", "Oligodendrocytes", "Neurotrophic\nFactors"))
+
+
+wdf_33_b <- wdf_33_a %>%
+  group_by(group) %>%
+  arrange(desc(n)) %>%
+  mutate(marker = factor(marker, levels = unique(marker))) %>%
+  ungroup()  
+
+
+lighter_blue_palette <- colorRampPalette(c("#99CCFF", "#99CCFF"))(length(unique(wdf_33_b$marker)))
+
+
+ggplot(wdf_33_b, aes(x = group, y = n, fill = marker)) + 
+  geom_bar(stat = 'identity', 
+           position = position_dodge(width = 0.9), 
+           color = "black", 
+           size = 0.3) + 
+  geom_text(aes(label = paste(marker)), 
+            position = position_dodge(width = 0.9), 
+            vjust = -0.5,
+            hjust = 0,
+            size = 5,      
+            fontface = "bold", 
+            color = "black",
+            angle = 60) +  
+  scale_fill_manual(values = lighter_blue_palette) +  
+  scale_y_continuous(breaks = seq(0, max(wdf_33_b$n)+5, by = 5), 
+                     expand = expansion(mult = c(0, 0.1)),  
+                     name = "Count") + 
+  theme_minimal(base_size = 14, base_family = "") +  
+  theme(panel.background = element_rect(fill = "#f0f0f0"),  
+        legend.position = "none",  
+        plot.title = element_text(hjust = 0.5, size = 21, face = "bold"),  
+        axis.text.x = element_text(size = 13.5, face = "bold"),
+        axis.text.y = element_text(size = 16, face = "bold"),  
+        axis.title.x = element_blank(),
+        axis.title.y = element_text(size = 16, face = "bold"),
+        panel.grid.major.y = element_line(color = "grey70", size = 1, linetype = "dashed")) +  
+  ggtitle("In Vitro Analysis of Neural Protein Markers") 
+
+```
+
+```{r}
+  #  Fig 11_A  #
+
+wdf_34_c <- read_csv('C:\\Users\\Mhaha\\wdf_34_c.csv')
+wdf_34_c <- wdf_34_c[,-1]
+
+colnames(wdf_34_c) = c('Protein_Marker','n')
+wdf_34_c$Protein_Marker <- fct_reorder(wdf_34_c$Protein_Marker, wdf_34_c$n, .desc = TRUE)
+
+ggplot(wdf_34_c, aes(x = n, y = Protein_Marker, fill = Protein_Marker)) +  
+  geom_bar(stat = 'identity', 
+           position = position_dodge(width = 0.9), 
+           color = "black", 
+           size = 0.3) +  
+  geom_text(aes(label = paste( n)), 
+            position = position_dodge(width = 0.9), 
+            hjust = -0.3,  
+            size = 6,      
+            fontface = "bold", 
+            color = "black") +  
+  scale_fill_manual(values = colorRampPalette(c("lightgray", "darkgray"))(length(unique(wdf_34_c$Protein_Marker)))) +  
+  scale_x_continuous(breaks = seq(0, max(wdf_34_c$n), by = 2),  
+                     expand = expansion(mult = c(0, 0.1)),  
+                     name = "Count",  
+                     labels = scales::label_number(scale = 1)) +  
+  theme_minimal(base_size = 14) +  
+  theme(panel.background = element_rect(fill = "#f0f0f0"),  
+        legend.position = "none",  
+        plot.title = element_text(hjust = 0.5, size = 20, face = "bold"),  
+        axis.text.y = element_text(size = 17, face = "bold"),  
+        axis.text.x = element_text(size = 17, face = "bold"),  
+        axis.title.y = element_blank(),  
+        axis.title.x = element_text(size = 17)) +  
+  ggtitle("In Vivo Analysis of Neural Protein Markers") 
+```
+
